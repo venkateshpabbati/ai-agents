@@ -42,5 +42,5 @@ agent = Agent(
 )
 
 agent.print_response(
-    "Summarize and compare analyst recommendations and fundamentals for TSLA and Phidata. Show in tables.", stream=True
+    "Summarize and compare analyst recommendations and fundamentals for TSLA and MSFT. Show in tables.", stream=True
 )

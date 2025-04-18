@@ -9,8 +9,8 @@ load_dotenv()
 
 web_agent = Agent(
     name="Web Agent",
-    model=Groq(id="llama-3.3-70b-versatile"),
-    # model=OpenAIChat(id="gpt-4o"),
+    # model=Groq(id="llama-3.3-70b-versatile"),
+    model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGo()],
     instructions=["Always include sources"],
     show_tool_calls=True,
@@ -20,8 +20,8 @@ web_agent = Agent(
 finance_agent = Agent(
     name="Finance Agent",
     role="Get financial data",
-    model=Groq(id="llama-3.3-70b-versatile"),
-    # model=OpenAIChat(id="gpt-4o"),
+    # model=Groq(id="llama-3.3-70b-versatile"),
+    model=OpenAIChat(id="gpt-4o"),
     tools=[YFinanceTools(stock_price=True, analyst_recommendations=True, company_info=True)],
     instructions=["Use tables to display data"],
     show_tool_calls=True,
@@ -29,7 +29,8 @@ finance_agent = Agent(
 )
 
 agent_team = Agent(
-    model=Groq(id="llama-3.3-70b-versatile"),
+    # model=Groq(id="llama-3.3-70b-versatile"),
+    model=OpenAIChat(id="gpt-4o"),
     team=[web_agent, finance_agent],
     instructions=["Always include sources", "Use tables to display data"],
     show_tool_calls=True,
