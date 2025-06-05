@@ -13,4 +13,9 @@ is for MCP server that interacts with mock leave database and responds to MCP cl
 8. Kill any running instance of Claude from Task Manager. Restart Claude Desktop
 9. In Claude desktop, now you will see tools from this server
 
+# Database Information
+- This server uses an SQLite database named `leave_management.db`.
+- When you run the server (e.g., using `python main.py` or via the MCP client interaction if it's started by the client environment), this database file will be automatically created in the `2_mcp_leave_management/` directory if it doesn't already exist.
+- The database is also automatically initialized with sample employee data and leave history upon its first creation, allowing you to test the tools immediately.
+
 @All rights reserved. Codebasics Inc. LearnerX Pvt Ltd. 

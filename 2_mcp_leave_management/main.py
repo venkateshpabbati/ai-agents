@@ -1,61 +1,131 @@
+"""
+Main MCP server file for the Leave Management Tutorial.
+
+This script defines an MCP (My Computational Platform) server with tools for:
+- Checking employee leave balances.
+- Applying for leave, with validation for dates and availability.
+- Retrieving employee leave history.
+
+It integrates with `database.py` to persist leave data in an SQLite database.
+The server is an instance of FastMCP, named "LeaveManager".
+"""
 from mcp.server.fastmcp import FastMCP
 from typing import List
+from . import database # Use relative import for modules within the same package
+import datetime
+import re
 
-# In-memory mock database with 20 leave days to start
-employee_leaves = {
-    "E001": {"balance": 18, "history": ["2024-12-25", "2025-01-01"]},
-    "E002": {"balance": 20, "history": []}
-}
 
-# Create MCP server
+# Create MCP server instance, naming it "LeaveManager"
 mcp = FastMCP("LeaveManager")
 
-# Tool: Check Leave Balance
+
+# --- Tool Definitions ---
+
 @mcp.tool()
 def get_leave_balance(employee_id: str) -> str:
-    """Check how many leave days are left for the employee"""
-    data = employee_leaves.get(employee_id)
+    """
+    Checks the remaining leave balance for a given employee ID.
+    Example: "How many leave days does E001 have?"
+    """
+    data = database.get_employee_data(employee_id)
     if data:
-        return f"{employee_id} has {data['balance']} leave days remaining."
+        return f"Employee {employee_id} has {data['balance']} leave days remaining."
     return "Employee ID not found."
 
 # Tool: Apply for Leave with specific dates
 @mcp.tool()
 def apply_leave(employee_id: str, leave_dates: List[str]) -> str:
     """
-    Apply leave for specific dates (e.g., ["2025-04-17", "2025-05-01"])
+    Apply leave for an employee for one or more specific dates.
+    Dates should be provided in "YYYY-MM-DD" format (e.g., ["2025-04-17", "2025-05-01"]).
+    The tool validates date formats, checks if dates are in the past,
+    verifies if dates are already booked, and ensures sufficient leave balance.
+    Example: "Apply leave for E001 on 2025-06-10 and 2025-06-11"
     """
-    if employee_id not in employee_leaves:
+    # Fetch employee data from the database
+    data = database.get_employee_data(employee_id)
+    if not data:
         return "Employee ID not found."
 
-    requested_days = len(leave_dates)
-    available_balance = employee_leaves[employee_id]["balance"]
+    if not leave_dates:
+        return "No leave dates provided. Please specify the dates you want to apply for."
+
+    parsed_leave_dates = []
+    today = datetime.date.today()
+    current_history = data.get('history', [])  # Default to empty list if no history
+
+    # Validate each date provided
+    for date_str in leave_dates:
+        # Check format "YYYY-MM-DD"
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
+            return f"Invalid date format: '{date_str}'. Please use YYYY-MM-DD format."
+        # Check if the date is valid (e.g., not 2023-02-30)
+        try:
+            leave_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return f"Invalid date value: '{date_str}'. Please ensure dates are correct (e.g., not 2023-02-30)."
+
+        # Check if the date is in the past
+        if leave_date < today:
+            return f"Cannot apply for leave in the past: '{date_str}' is before today ({today})."
+
+        # Check if the date is already booked
+        if date_str in current_history:
+            return f"Date {date_str} is already booked as leave for employee {employee_id}."
+
+        parsed_leave_dates.append(date_str)  # Store validated dates (original string format)
+
+    # Check for sufficient balance
+    requested_days = len(parsed_leave_dates)
+    available_balance = data["balance"]
 
     if available_balance < requested_days:
-        return f"Insufficient leave balance. You requested {requested_days} day(s) but have only {available_balance}."
+        return f"Insufficient leave balance for {employee_id}. Requested: {requested_days} day(s), Available: {available_balance}."
 
-    # Deduct balance and add to history
-    employee_leaves[employee_id]["balance"] -= requested_days
-    employee_leaves[employee_id]["history"].extend(leave_dates)
+    # Update database
+    new_balance = available_balance - requested_days
+    if database.update_employee_leave(employee_id, new_balance, parsed_leave_dates):
+        return f"Leave applied successfully for {requested_days} day(s) for {employee_id}. New balance: {new_balance}."
+    else:
+        # This case might indicate a concurrent modification or unexpected DB issue.
+        return "Failed to update leave records in the database. Please try again or contact support if the issue persists."
 
-    return f"Leave applied for {requested_days} day(s). Remaining balance: {employee_leaves[employee_id]['balance']}."
 
-
-# Resource: Leave history
 @mcp.tool()
 def get_leave_history(employee_id: str) -> str:
-    """Get leave history for the employee"""
-    data = employee_leaves.get(employee_id)
+    """
+    Retrieves the leave history for a given employee ID.
+    Returns a list of dates or a message if no leave has been taken.
+    Example: "Show me the leave history for E002"
+    """
+    data = database.get_employee_data(employee_id)
     if data:
-        history = ', '.join(data['history']) if data['history'] else "No leaves taken."
-        return f"Leave history for {employee_id}: {history}"
+        history_list = data['history']
+        if history_list:
+            # Format for better readability if there are many dates
+            history_str = ', '.join(sorted(list(set(history_list)))) # Sort and remove duplicates for display
+            return f"Leave history for employee {employee_id}: {history_str}."
+        else:
+            return f"Employee {employee_id} has no leave history."
     return "Employee ID not found."
 
-# Resource: Greeting
+
+# --- Resource Definitions ---
+
 @mcp.resource("greeting://{name}")
 def get_greeting(name: str) -> str:
-    """Get a personalized greeting"""
+    """
+    Provides a personalized greeting.
+    This is a simple resource example.
+    Example URI: greeting://Alice
+    """
     return f"Hello, {name}! How can I assist you with leave management today?"
 
+
+# --- Server Execution ---
+
 if __name__ == "__main__":
+    # This allows running the MCP server directly using `python main.py`
+    # The database (leave_management.db) will be created/updated in the same directory.
     mcp.run()
